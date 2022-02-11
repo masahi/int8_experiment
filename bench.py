@@ -15,11 +15,18 @@ def test_dense_vnni():
         data_shape = (m, k)
         weight_shape = (n, k)
 
+        with_bias = False
+
         data = relay.var("data", shape=data_shape, dtype="uint8")
         weight = relay.var("weight", shape=weight_shape, dtype="int8")
         bias = relay.var("bias", shape=(weight_shape[0],), dtype="int32")
         dense = relay.nn.dense(data, weight, out_dtype="int32")
-        out = relay.nn.bias_add(dense, bias)
+
+        if with_bias:
+            out = relay.nn.bias_add(dense, bias)
+        else:
+            out = dense
+
         mod = tvm.IRModule.from_expr(out)
 
         target = "llvm -mcpu=cascadelake"
@@ -35,7 +42,12 @@ def test_dense_vnni():
 
         runtime.set_input("data", a)
         runtime.set_input("weight", b)
-        runtime.set_input("bias", c)
+
+        if with_bias:
+            runtime.set_input("bias", c)
+        else:
+            c = np.zeros_like(c)
+
         runtime.run()
 
         out = runtime.get_output(0).numpy()
@@ -43,7 +55,9 @@ def test_dense_vnni():
 
         np.testing.assert_equal(out, ref)
 
-        print(runtime.benchmark(dev, number=1, repeat=500))
+        gops_per_mm = 2 * m * n * k
+        elapsed = runtime.benchmark(dev, number=1, repeat=500).mean
+        print(m, n, k, gops_per_mm / elapsed / 1e9)
 
 
 test_dense_vnni()
