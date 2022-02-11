@@ -3,15 +3,20 @@ import tvm
 from tvm import relay
 
 
+fbgemm_workloads = [
+    (64, 800, 320),
+    (64, 768, 512),
+    (16, 256, 512),
+    (128, 128, 128),
+    (256, 512, 256),
+    (1024, 1024, 1024),
+]
+
+bert_workloads = [(128, 768, 3072), (128, 768, 768), (128, 3072, 768)]
+
+
 def test_dense_vnni():
-    for m, n, k in [
-        (64, 800, 320),
-        (64, 768, 512),
-        (16, 256, 512),
-        (128, 128, 128),
-        (256, 512, 256),
-        (1024, 1024, 1024),
-    ]:
+    for m, n, k in bert_workloads:
         data_shape = (m, k)
         weight_shape = (n, k)
 
