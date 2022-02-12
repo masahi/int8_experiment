@@ -56,7 +56,7 @@ def test_dense_vnni():
         runtime.run()
 
         out = runtime.get_output(0).numpy()
-        ref = np.dot(a, b.transpose()) + c
+        ref = np.dot(a.astype("int32"), b.transpose().astype("int32")) + c.astype("int32")
 
         np.testing.assert_equal(out, ref)
 
