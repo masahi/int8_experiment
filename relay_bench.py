@@ -16,7 +16,7 @@ fbgemm_workloads = [
 
 bert_workloads = [(128, 768, 3072), (128, 768, 768), (128, 3072, 768)]
 
-log_file = "dense_vnni.log"
+
 measure_option = autotvm.measure_option(
     builder=autotvm.LocalBuilder(),
     runner=autotvm.LocalRunner(
@@ -25,7 +25,7 @@ measure_option = autotvm.measure_option(
 )
 
 
-def tune(task, use_random=False):
+def tune(log_file, task, use_random=False):
     if use_random:
         tuner_obj = RandomTuner(task)
     else:
@@ -43,7 +43,7 @@ def tune(task, use_random=False):
     )
 
 
-def test(mod, params, input_names, np_inputs, np_out, do_tune=True):
+def test(mod, params, input_names, np_inputs, np_out, log_file, do_tune=True):
     target = "llvm -mcpu=cascadelake"
 
     if do_tune:
@@ -55,7 +55,7 @@ def test(mod, params, input_names, np_inputs, np_out, do_tune=True):
             target=target,
             params=opt_params,
         )
-        tune(tasks[0])
+        tune(log_file, tasks[0])
 
         with autotvm.apply_history_best(log_file):
             with tvm.transform.PassContext(opt_level=3):
@@ -81,6 +81,7 @@ def test(mod, params, input_names, np_inputs, np_out, do_tune=True):
 
 
 def test_dense_vnni():
+    log_file = "dense_vnni.log"
     for m, n, k in fbgemm_workloads + bert_workloads:
         data_shape = (m, k)
         weight_shape = (n, k)
@@ -113,13 +114,20 @@ def test_dense_vnni():
         )
 
         gops_per_mm = 2 * m * n * k
-        elapsed = test(mod, params, ["data"], [a], ref)
+        elapsed = test(mod, params, ["data"], [a], ref, log_file)
         print(m, n, k, gops_per_mm / elapsed / 1e9)
 
 
 def test_batch_matmul_vnni():
-    batch = 8
+    log_file = "dense_batch_matmul.log"
+    workloads = []
     for m, n, k in fbgemm_workloads + bert_workloads:
+        batch = 8
+        workloads.append((batch, m, n, k))
+
+    bert_bmm_workloads = [(16, 384, 384, 64), (16, 384, 64, 384)]
+
+    for batch, m, n, k in workloads + bert_bmm_workloads:
         x_shape = (batch, m, k)
         y_shape = (batch, n, k)
 
@@ -137,9 +145,9 @@ def test_batch_matmul_vnni():
         gops_per_mm = 2 * m * n * k * batch
         ref = tvm.topi.testing.batch_matmul(a, b, out_dtype="int32")
 
-        elapsed = test(mod, params, ["x", "y"], [a, b], ref)
-        print(m, n, k, gops_per_mm / elapsed / 1e9)
+        elapsed = test(mod, params, ["x", "y"], [a, b], ref, log_file)
+        print(batch, m, n, k, gops_per_mm / elapsed / 1e9)
 
 
-test_dense_vnni()
-# test_batch_matmul_vnni()
+# test_dense_vnni()
+test_batch_matmul_vnni()
