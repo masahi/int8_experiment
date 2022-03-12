@@ -125,9 +125,10 @@ def test_batch_matmul_vnni():
         batch = 8
         workloads.append((batch, m, n, k))
 
-    bert_bmm_workloads = [(16, 384, 384, 64), (16, 384, 64, 384)]
+    seq_len = 384
+    bert_bmm_workloads = [(16, seq_len, seq_len, 64), (16, seq_len, 64, seq_len)]
 
-    for batch, m, n, k in workloads + bert_bmm_workloads:
+    for batch, m, n, k in bert_bmm_workloads:
         x_shape = (batch, m, k)
         y_shape = (batch, n, k)
 
